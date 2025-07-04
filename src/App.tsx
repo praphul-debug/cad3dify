@@ -1,11 +1,11 @@
 import React from 'react'
-import { EnhancedCadProcessor } from './components/EnhancedCadProcessor'
+import { CadProcessor } from './components/CadProcessor'
 import './App.css'
 
 function App() {
   return (
     <div className="App">
-      <EnhancedCadProcessor />
+      <CadProcessor />
     </div>
   )
 }
