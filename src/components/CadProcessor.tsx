@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import * as THREE from 'three'
-import { supabase } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 interface ProcessingResult {
   success: boolean
@@ -32,7 +32,9 @@ export const CadProcessor: React.FC = () => {
     {
       id: '1',
       type: 'system',
-      content: 'Welcome to CAD3Dify! Upload a 2D CAD drawing and I\'ll convert it to a 3D model using advanced AI.',
+      content: isSupabaseConfigured() 
+        ? 'Welcome to CAD3Dify! Upload a 2D CAD drawing and I\'ll convert it to a 3D model using advanced AI.'
+        : 'Welcome to CAD3Dify! This is a demo version. To enable full functionality, please configure Supabase by clicking the "Connect to Supabase" button in the top right.',
       timestamp: new Date()
     }
   ])
@@ -413,6 +415,14 @@ export const CadProcessor: React.FC = () => {
   const processImage = async () => {
     if (!selectedFile) return
 
+    if (!isSupabaseConfigured()) {
+      addMessage({
+        type: 'assistant',
+        content: '⚠️ Supabase is not configured. This is a demo version. To enable full CAD processing functionality, please configure Supabase by clicking the "Connect to Supabase" button in the top right corner.'
+      })
+      return
+    }
+
     setIsProcessing(true)
 
     addMessage({
@@ -489,6 +499,20 @@ export const CadProcessor: React.FC = () => {
                            radial-gradient(circle at 75% 75%, #8b5cf6 0%, transparent 50%)`
         }}></div>
       </div>
+
+      {/* Configuration Notice */}
+      {!isSupabaseConfigured() && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-amber-500/90 backdrop-blur-sm text-amber-900 px-6 py-3 rounded-xl shadow-lg border border-amber-400/50">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="text-sm font-medium">Demo Mode - Configure Supabase to enable full functionality</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chat Panel */}
       <div className={`${isChatCollapsed ? 'w-16' : 'w-full md:w-96 lg:w-[28rem]'} bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/50 flex flex-col transition-all duration-300 ease-in-out shadow-2xl relative z-10`}>
@@ -651,7 +675,7 @@ export const CadProcessor: React.FC = () => {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Generate 3D Model
+                    {isSupabaseConfigured() ? 'Generate 3D Model' : 'Demo Mode - Configure Supabase'}
                   </div>
                 )}
               </button>
