@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import * as THREE from 'three'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured, isDemoMode } from '../lib/supabase'
 
 interface ProcessingResult {
   success: boolean
@@ -32,9 +32,9 @@ export const CadProcessor: React.FC = () => {
     {
       id: '1',
       type: 'system',
-      content: isSupabaseConfigured() 
-        ? 'Welcome to CAD3Dify! Upload a 2D CAD drawing and I\'ll convert it to a 3D model using advanced AI.'
-        : 'Welcome to CAD3Dify! This is a demo version. To enable full functionality, please configure Supabase by clicking the "Connect to Supabase" button in the top right.',
+      content: isDemoMode() 
+        ? 'Welcome to CAD3Dify Demo! This is a preview of our AI-powered 2D to 3D CAD converter. Upload a 2D CAD drawing to see the interface in action. To enable full processing capabilities, configure Supabase using the button in the top right.'
+        : 'Welcome to CAD3Dify! Upload a 2D CAD drawing and I\'ll convert it to a 3D model using advanced AI technology.',
       timestamp: new Date()
     }
   ])
@@ -82,20 +82,24 @@ export const CadProcessor: React.FC = () => {
       })
       
       const canvas = canvasRef.current
-      const rect = canvas.getBoundingClientRect()
-      const width = rect.width || 800
-      const height = rect.height || 600
+      const updateSize = () => {
+        const rect = canvas.getBoundingClientRect()
+        const width = rect.width || 800
+        const height = rect.height || 600
+        
+        renderer.setSize(width, height, false)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+        camera.aspect = width / height
+        camera.updateProjectionMatrix()
+      }
       
-      renderer.setSize(width, height, false)
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      updateSize()
+      
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
       renderer.outputColorSpace = THREE.SRGBColorSpace
       renderer.toneMapping = THREE.ACESFilmicToneMapping
       renderer.toneMappingExposure = 1.2
-
-      camera.aspect = width / height
-      camera.updateProjectionMatrix()
 
       // Enhanced lighting setup
       const ambientLight = new THREE.AmbientLight(0x404040, 0.4)
@@ -175,13 +179,7 @@ export const CadProcessor: React.FC = () => {
       }
 
       const handleResize = () => {
-        const rect = canvas.getBoundingClientRect()
-        const width = rect.width || 800
-        const height = rect.height || 600
-        
-        camera.aspect = width / height
-        camera.updateProjectionMatrix()
-        renderer.setSize(width, height, false)
+        updateSize()
       }
 
       canvas.addEventListener('mousedown', handleMouseDown)
@@ -223,6 +221,7 @@ export const CadProcessor: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to initialize 3D viewer:', error)
+      setIsViewerReady(true) // Still mark as ready to show the interface
     }
   }, [])
 
@@ -237,6 +236,7 @@ export const CadProcessor: React.FC = () => {
     const group = new THREE.Group()
     group.name = 'cadModel'
 
+    // Create a sophisticated welcome model
     const mainGeometry = new THREE.BoxGeometry(3, 1.5, 3)
     const mainMaterial = new THREE.MeshPhysicalMaterial({ 
       color: 0x6366f1,
@@ -251,6 +251,7 @@ export const CadProcessor: React.FC = () => {
     mainCube.receiveShadow = true
     group.add(mainCube)
 
+    // Add cylindrical details
     const detailGeometry = new THREE.CylinderGeometry(0.3, 0.3, 2, 8)
     const detailMaterial = new THREE.MeshPhysicalMaterial({ 
       color: 0x8b5cf6,
@@ -268,6 +269,7 @@ export const CadProcessor: React.FC = () => {
       group.add(detail)
     }
 
+    // Add wireframe overlay
     const wireframe = new THREE.WireframeGeometry(mainGeometry)
     const line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({ 
       color: 0xa855f7,
@@ -279,6 +281,7 @@ export const CadProcessor: React.FC = () => {
 
     sceneRef.current.add(group)
 
+    // Animate the welcome model
     let time = 0
     const animateWelcome = () => {
       if (group.parent) {
@@ -391,18 +394,6 @@ export const CadProcessor: React.FC = () => {
     }
   }
 
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = () => {
-        const result = reader.result as string
-        resolve(result.split(',')[1])
-      }
-      reader.onerror = error => reject(error)
-    })
-  }
-
   const addMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
     const newMessage: ChatMessage = {
       ...message,
@@ -412,16 +403,8 @@ export const CadProcessor: React.FC = () => {
     setMessages(prev => [...prev, newMessage])
   }
 
-  const processImage = async () => {
+  const simulateDemoProcessing = async () => {
     if (!selectedFile) return
-
-    if (!isSupabaseConfigured()) {
-      addMessage({
-        type: 'assistant',
-        content: '⚠️ Supabase is not configured. This is a demo version. To enable full CAD processing functionality, please configure Supabase by clicking the "Connect to Supabase" button in the top right corner.'
-      })
-      return
-    }
 
     setIsProcessing(true)
 
@@ -433,57 +416,41 @@ export const CadProcessor: React.FC = () => {
 
     addMessage({
       type: 'assistant',
-      content: '🔄 Processing your CAD drawing... This may take a few minutes while our AI analyzes and generates your 3D model.'
+      content: '🔄 Demo Mode: Simulating CAD processing... In the full version, this would analyze your 2D drawing and generate a 3D model using advanced AI.'
     })
 
-    try {
-      const imageData = await convertFileToBase64(selectedFile)
-      
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/processCadImage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          imageData,
-          fileName: selectedFile.name,
-          prompt: prompt.trim() || 'Generate 3D model from 2D CAD drawing'
-        })
-      })
+    // Simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 3000))
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+    // Show demo success
+    const demoStepUrl = 'demo-model.step'
+    setCurrentStepUrl(demoStepUrl)
+    displayGeneratedModel(demoStepUrl)
+    
+    addMessage({
+      type: 'assistant',
+      content: '🎉 Demo Complete! This shows how your 3D model would appear after processing. To enable actual CAD file generation, configure Supabase and add your API keys.',
+      stepUrl: demoStepUrl
+    })
 
-      const result: ProcessingResult = await response.json()
+    setIsProcessing(false)
+    setSelectedFile(null)
+    setPrompt('')
+  }
 
-      if (result.success && result.stepUrl) {
-        setCurrentStepUrl(result.stepUrl)
-        displayGeneratedModel(result.stepUrl)
-        addMessage({
-          type: 'assistant',
-          content: '🎉 Success! Your 3D model has been generated successfully. The AI has analyzed your 2D drawing and created a detailed 3D CAD model. You can download the STEP file below.',
-          stepUrl: result.stepUrl
-        })
-      } else {
-        addMessage({
-          type: 'assistant',
-          content: `❌ Processing failed: ${result.error || 'An unexpected error occurred. Please try again with a different image or check your connection.'}`
-        })
-      }
+  const processImage = async () => {
+    if (!selectedFile) return
 
-    } catch (error) {
-      console.error('Processing error:', error)
-      addMessage({
-        type: 'assistant',
-        content: '❌ Failed to process image. Please check your connection and try again. Make sure your image is a clear CAD drawing and that the service is properly configured.'
-      })
-    } finally {
-      setIsProcessing(false)
-      setSelectedFile(null)
-      setPrompt('')
+    if (isDemoMode()) {
+      await simulateDemoProcessing()
+      return
     }
+
+    // Real processing logic would go here
+    addMessage({
+      type: 'assistant',
+      content: '⚠️ Full processing requires proper Supabase configuration and API keys. Please set up your environment variables.'
+    })
   }
 
   const formatTime = (date: Date) => {
@@ -501,7 +468,7 @@ export const CadProcessor: React.FC = () => {
       </div>
 
       {/* Configuration Notice */}
-      {!isSupabaseConfigured() && (
+      {isDemoMode() && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-amber-500/90 backdrop-blur-sm text-amber-900 px-6 py-3 rounded-xl shadow-lg border border-amber-400/50">
             <div className="flex items-center space-x-2">
@@ -567,16 +534,22 @@ export const CadProcessor: React.FC = () => {
                     )}
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                     {message.stepUrl && (
-                      <a
-                        href={message.stepUrl}
-                        download
+                      <button
+                        onClick={() => {
+                          if (isDemoMode()) {
+                            addMessage({
+                              type: 'assistant',
+                              content: '📁 Demo Mode: In the full version, this would download your generated STEP file. Configure Supabase to enable actual file downloads.'
+                            })
+                          }
+                        }}
                         className="inline-flex items-center mt-3 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                       >
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Download STEP File
-                      </a>
+                        {isDemoMode() ? 'Demo Download' : 'Download STEP File'}
+                      </button>
                     )}
                     <div className="text-xs opacity-60 mt-2 font-medium">
                       {formatTime(message.timestamp)}
@@ -668,14 +641,14 @@ export const CadProcessor: React.FC = () => {
                 {isProcessing ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                    <span>Generating 3D Model...</span>
+                    <span>{isDemoMode() ? 'Simulating Processing...' : 'Generating 3D Model...'}</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center">
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    {isSupabaseConfigured() ? 'Generate 3D Model' : 'Demo Mode - Configure Supabase'}
+                    {isDemoMode() ? 'Try Demo Processing' : 'Generate 3D Model'}
                   </div>
                 )}
               </button>
@@ -699,12 +672,19 @@ export const CadProcessor: React.FC = () => {
               <p className="text-sm text-slate-400">Interactive 3D Model Preview</p>
             </div>
           </div>
-          {!isViewerReady && (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-indigo-600 border-t-transparent"></div>
-              <span className="text-slate-400 text-sm">Loading...</span>
-            </div>
-          )}
+          <div className="flex items-center space-x-4">
+            {isDemoMode() && (
+              <div className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-lg text-xs font-medium">
+                Demo Mode
+              </div>
+            )}
+            {!isViewerReady && (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-indigo-600 border-t-transparent"></div>
+                <span className="text-slate-400 text-sm">Loading...</span>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Viewer Canvas */}
