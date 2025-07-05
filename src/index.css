@@ -10,6 +10,7 @@
 
 html, body, #root {
   height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -19,6 +20,12 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #020617;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Custom scrollbar */
@@ -50,4 +57,12 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
